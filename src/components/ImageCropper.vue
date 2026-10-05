@@ -11,7 +11,9 @@ const emit = defineEmits<{
 const containerRef = ref<HTMLDivElement>()
 const imgRef = ref<HTMLImageElement>()
 
+// 图片实际显示尺寸和偏移
 const displaySize = ref({ width: 0, height: 0 })
+const imgOffset = ref({ x: 0, y: 0 })
 const naturalSize = ref({ width: 0, height: 0 })
 
 const crop = ref({ x: 0, y: 0, w: 0, h: 0 })
@@ -26,11 +28,21 @@ const HANDLE = 28
 function onImgLoad() {
   const img = imgRef.value!
   naturalSize.value = { width: img.naturalWidth, height: img.naturalHeight }
-  const rect = containerRef.value!.getBoundingClientRect()
-  displaySize.value = { width: rect.width, height: rect.height }
+  updateImgMetrics()
   if (!initialized.value) {
     initCrop()
     initialized.value = true
+  }
+}
+
+function updateImgMetrics() {
+  const img = imgRef.value!
+  const imgRect = img.getBoundingClientRect()
+  const conRect = containerRef.value!.getBoundingClientRect()
+  displaySize.value = { width: imgRect.width, height: imgRect.height }
+  imgOffset.value = {
+    x: imgRect.left - conRect.left,
+    y: imgRect.top - conRect.top,
   }
 }
 
@@ -44,11 +56,12 @@ function initCrop() {
   }
 }
 
+// 返回相对于图片左上角的坐标
 function getPointer(e: PointerEvent) {
-  const rect = containerRef.value!.getBoundingClientRect()
+  const conRect = containerRef.value!.getBoundingClientRect()
   return {
-    x: e.clientX - rect.left,
-    y: e.clientY - rect.top,
+    x: e.clientX - conRect.left - imgOffset.value.x,
+    y: e.clientY - conRect.top - imgOffset.value.y,
   }
 }
 
@@ -158,9 +171,10 @@ async function confirmCrop() {
   emit('crop', result)
 }
 
+// 选框定位需要加上图片在容器中的偏移
 const cropStyle = computed(() => ({
-  left: crop.value.x + 'px',
-  top: crop.value.y + 'px',
+  left: crop.value.x + imgOffset.value.x + 'px',
+  top: crop.value.y + imgOffset.value.y + 'px',
   width: crop.value.w + 'px',
   height: crop.value.h + 'px',
 }))
@@ -219,12 +233,18 @@ const hasCrop = computed(() => crop.value.w > 10 && crop.value.h > 10)
   overflow: hidden;
   touch-action: none;
   background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .crop-img {
-  width: 100%;
-  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
   display: block;
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
 .crop-box {
