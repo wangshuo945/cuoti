@@ -5,6 +5,7 @@ import DetailPage from '@/pages/DetailPage.vue'
 import ReviewPage from '@/pages/ReviewPage.vue'
 import MinePage from '@/pages/MinePage.vue'
 import AISettingsPage from '@/pages/AISettingsPage.vue'
+import QuizPage from '@/pages/QuizPage.vue'
 
 const routes = [
   {
@@ -42,6 +43,12 @@ const routes = [
     name: 'ai-settings',
     component: AISettingsPage,
     meta: { title: 'AI 设置' },
+  },
+  {
+    path: '/quiz',
+    name: 'quiz',
+    component: QuizPage,
+    meta: { title: '刷题练习' },
   },
 ]
 

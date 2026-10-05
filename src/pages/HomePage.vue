@@ -12,6 +12,7 @@ import {
   Calendar,
   Search,
   X,
+  Pencil,
 } from 'lucide-vue-next'
 import { PullRefresh } from 'vant'
 
@@ -191,6 +192,24 @@ function getTodayDate() {
     </div>
 
     <div class="px-4 -mt-12 relative z-10">
+      <!-- 刷题入口 -->
+      <button
+        v-if="!showSearch"
+        class="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-2xl p-4 mb-4 flex items-center justify-between active:scale-[0.98] transition-transform"
+        @click="router.push('/quiz')"
+      >
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+            <Pencil :size="20" />
+          </div>
+          <div class="text-left">
+            <p class="font-bold text-sm">刷题练习</p>
+            <p class="text-xs text-white/80">从错题中随机抽题，自我检测</p>
+          </div>
+        </div>
+        <Plus :size="20" class="text-white/80" />
+      </button>
+
       <!-- 搜索结果计数 -->
       <div v-if="showSearch && searchKeyword.trim()" class="mb-3 text-sm text-gray-500">
         找到 {{ searchResults.length }} 条相关错题
