@@ -5,6 +5,7 @@ import { useMistakeStore } from '@/stores/mistake'
 import { recognizeText } from '@/services/ocr'
 import { generateAnswer } from '@/services/ai'
 import { compressImage } from '@/utils/image'
+import ImageCropper from '@/components/ImageCropper.vue'
 import { NavBar, Button, Loading, showToast } from 'vant'
 import {
   Camera,
@@ -17,7 +18,7 @@ import {
 const router = useRouter()
 const mistakeStore = useMistakeStore()
 
-const step = ref<'upload' | 'ocr' | 'ai' | 'confirm'>('upload')
+const step = ref<'upload' | 'crop' | 'ocr' | 'ai' | 'confirm'>('upload')
 const imageData = ref('')
 const questionText = ref('')
 const answerText = ref('')
@@ -45,13 +46,23 @@ async function handleFileChange(event: Event) {
   try {
     const compressed = await compressImage(file, 1080, 0.8)
     imageData.value = compressed
-    step.value = 'ocr'
-    await startOCR()
+    step.value = 'crop'
   } catch {
     showToast({ message: '图片处理失败', type: 'fail' })
   }
 
   input.value = ''
+}
+
+function onCrop(dataUrl: string) {
+  imageData.value = dataUrl
+  step.value = 'ocr'
+  startOCR()
+}
+
+function onCropCancel() {
+  step.value = 'upload'
+  imageData.value = ''
 }
 
 async function startOCR() {
@@ -93,6 +104,8 @@ function goBack() {
   } else if (step.value === 'ai') {
     step.value = 'ocr'
   } else if (step.value === 'ocr') {
+    step.value = 'crop'
+  } else if (step.value === 'crop') {
     step.value = 'upload'
     imageData.value = ''
   } else {
@@ -136,13 +149,23 @@ async function saveMistake() {
 <template>
   <div class="capture-page min-h-screen bg-bg-page">
     <NavBar
+      v-if="step !== 'crop'"
       :title="step === 'upload' ? '录入错题' : step === 'ocr' ? '文字识别' : step === 'ai' ? 'AI解析' : '确认保存'"
       left-text="返回"
       left-arrow
       @click-left="goBack"
     />
 
-    <div class="p-4">
+    <!-- 裁剪步骤：全屏组件 -->
+    <div v-if="step === 'crop'" class="crop-screen">
+      <ImageCropper
+        :image-src="imageData"
+        @crop="onCrop"
+        @cancel="onCropCancel"
+      />
+    </div>
+
+    <div v-else class="p-4">
       <div v-if="step === 'upload'" class="fade-in-up">
         <div class="text-center mb-6 mt-8">
           <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-primary-100 flex items-center justify-center">
@@ -294,3 +317,17 @@ async function saveMistake() {
     />
   </div>
 </template>
+
+<style scoped>
+.crop-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 100;
+  background: #000;
+  display: flex;
+  flex-direction: column;
+}
+</style>
