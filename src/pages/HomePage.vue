@@ -14,7 +14,7 @@ import {
   X,
   Pencil,
 } from 'lucide-vue-next'
-import { PullRefresh, showToast, showDialog } from 'vant'
+import { PullRefresh, showToast } from 'vant'
 
 const router = useRouter()
 const mistakeStore = useMistakeStore()
@@ -75,27 +75,18 @@ const longPressTriggered = ref(false)
 async function renameSubject(subjectId: string) {
   if (subjectId === 'all') return
   const oldName = subjectId
-  showDialog({
-    title: '修改学科名称',
-    message: `将"${oldName}"改为：`,
-    showCancelButton: true,
-    beforeClose: async (action: string): Promise<boolean> => {
-      if (action !== 'confirm') return true
-      const input = document.querySelector('.van-dialog__input input') as HTMLInputElement
-      const newName = input?.value?.trim()
-      if (!newName || newName === oldName) return false
-      const mistakes = mistakeStore.mistakes.filter(m => m.subject === oldName)
-      for (const m of mistakes) {
-        if (m.id) {
-          await mistakeStore.updateMistake(m.id, { subject: newName })
-        }
-      }
-      await mistakeStore.loadAll()
-      activeSubject.value = 'all'
-      showToast('学科名称已修改')
-      return true
-    },
-  }).catch(() => {})
+  const newName = window.prompt(`将"${oldName}"改为：`, oldName)
+  if (!newName || newName.trim() === oldName || !newName.trim()) return
+
+  const mistakes = mistakeStore.mistakes.filter(m => m.subject === oldName)
+  for (const m of mistakes) {
+    if (m.id) {
+      await mistakeStore.updateMistake(m.id, { subject: newName.trim() })
+    }
+  }
+  await mistakeStore.loadAll()
+  activeSubject.value = 'all'
+  showToast('学科名称已修改')
 }
 
 function startLongPress(subjectId: string) {
