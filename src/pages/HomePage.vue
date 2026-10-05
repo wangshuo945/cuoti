@@ -62,46 +62,45 @@ const allSubjects = computed(() => {
 })
 
 function handleSubjectClick(subjectId: string) {
+  if (longPressTriggered.value) {
+    longPressTriggered.value = false
+    return
+  }
   activeSubject.value = subjectId
   mistakeStore.loadBySubject(subjectId)
 }
 
+const longPressTriggered = ref(false)
+
 async function renameSubject(subjectId: string) {
   if (subjectId === 'all') return
+  const oldName = subjectId
   showDialog({
     title: '修改学科名称',
-    message: `将"${subjectId}"改为：`,
+    message: `将"${oldName}"改为：`,
     showCancelButton: true,
-    beforeClose: (action: string, done: () => void) => {
-      if (action === 'confirm') {
-        const input = document.querySelector('.van-dialog__input input') as HTMLInputElement
-        const newName = input?.value?.trim()
-        if (!newName || newName === subjectId) {
-          done()
-          return
+    beforeClose: async (action: string): Promise<boolean> => {
+      if (action !== 'confirm') return true
+      const input = document.querySelector('.van-dialog__input input') as HTMLInputElement
+      const newName = input?.value?.trim()
+      if (!newName || newName === oldName) return false
+      const mistakes = mistakeStore.mistakes.filter(m => m.subject === oldName)
+      for (const m of mistakes) {
+        if (m.id) {
+          await mistakeStore.updateMistake(m.id, { subject: newName })
         }
-        // 更新所有该学科的错题
-        const mistakes = mistakeStore.mistakes.filter(m => m.subject === subjectId)
-        mistakes.forEach(m => {
-          if (m.id) {
-            mistakeStore.updateMistake(m.id, { subject: newName })
-          }
-        })
-        setTimeout(async () => {
-          await mistakeStore.loadAll()
-          activeSubject.value = 'all'
-          showToast('学科名称已修改')
-          done()
-        }, 300)
-      } else {
-        done()
       }
+      await mistakeStore.loadAll()
+      activeSubject.value = 'all'
+      showToast('学科名称已修改')
+      return true
     },
   }).catch(() => {})
 }
 
 function startLongPress(subjectId: string) {
   longPressTimer.value = setTimeout(() => {
+    longPressTriggered.value = true
     renameSubject(subjectId)
   }, 600)
 }
@@ -279,7 +278,7 @@ function getTodayDate() {
               : 'bg-gray-100 text-gray-600'"
             :style="activeSubject === subject.id ? { backgroundColor: subject.color } : {}"
             @click="handleSubjectClick(subject.id)"
-            @touchstart.prevent="subject.id !== 'all' && startLongPress(subject.id)"
+            @touchstart="subject.id !== 'all' && startLongPress(subject.id)"
             @touchend="clearLongPress"
             @contextmenu.prevent="renameSubject(subject.id)"
           >
