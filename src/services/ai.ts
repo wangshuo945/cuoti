@@ -6,8 +6,64 @@ export interface AIAnswer {
   analysis: string
 }
 
+export interface AICheckResult {
+  correct: boolean
+  feedback: string
+}
+
 // 统一通过 /api/ai 代理调用，开发和生产环境一致
 const AI_PROXY = '/api/ai'
+
+export async function checkAnswer(question: string, userAnswer: string, correctAnswer: string): Promise<AICheckResult> {
+  const provider = await getSetting('aiProvider')
+  const apiKey = await getSetting('aiApiKey')
+  const model = await getSetting('aiModel') || 'doubao-lite-4k'
+
+  if (!apiKey) {
+    // 无API时简单匹配
+    const correct = userAnswer.trim().toLowerCase() === correctAnswer.trim().toLowerCase()
+    return { correct, feedback: correct ? '回答正确！' : '回答不正确，请参考标准答案。' }
+  }
+
+  const prompt = `你是一位专业的批改老师。请判断学生的答案是否正确。
+
+题目：${question}
+
+标准答案：${correctAnswer}
+
+学生答案：${userAnswer}
+
+请严格按照以下JSON格式返回（不要包含其他文字）：
+{
+  "correct": true或false,
+  "feedback": "简短点评，指出对错原因，不超过100字"
+}
+
+判断标准：答案意思相近即算正确，不要求文字完全一致。`
+
+  try {
+    const res = await axios.post(AI_PROXY, {
+      provider,
+      apiKey,
+      model,
+      question: prompt,
+    })
+
+    if (res.data.content) {
+      const jsonStr = res.data.content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+      const parsed = JSON.parse(jsonStr)
+      return {
+        correct: !!parsed.correct,
+        feedback: parsed.feedback || '',
+      }
+    }
+    throw new Error('AI返回为空')
+  } catch {
+    // 降级为简单匹配
+    const correct = userAnswer.trim().toLowerCase() === correctAnswer.trim().toLowerCase()
+    return { correct, feedback: correct ? '回答正确！' : '回答不正确，请参考标准答案。' }
+  }
+}
 
 export async function generateAnswer(question: string): Promise<AIAnswer> {
   const provider = await getSetting('aiProvider')
