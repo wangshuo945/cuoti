@@ -14,12 +14,13 @@ import {
   X,
   Pencil,
 } from 'lucide-vue-next'
-import { PullRefresh } from 'vant'
+import { PullRefresh, showToast, showDialog } from 'vant'
 
 const router = useRouter()
 const mistakeStore = useMistakeStore()
 const activeSubject = ref('all')
 const refreshing = ref(false)
+const longPressTimer = ref<ReturnType<typeof setTimeout> | null>(null)
 const showSearch = ref(false)
 const searchKeyword = ref('')
 
@@ -63,6 +64,53 @@ const allSubjects = computed(() => {
 function handleSubjectClick(subjectId: string) {
   activeSubject.value = subjectId
   mistakeStore.loadBySubject(subjectId)
+}
+
+async function renameSubject(subjectId: string) {
+  if (subjectId === 'all') return
+  showDialog({
+    title: '修改学科名称',
+    message: `将"${subjectId}"改为：`,
+    showCancelButton: true,
+    beforeClose: (action: string, done: () => void) => {
+      if (action === 'confirm') {
+        const input = document.querySelector('.van-dialog__input input') as HTMLInputElement
+        const newName = input?.value?.trim()
+        if (!newName || newName === subjectId) {
+          done()
+          return
+        }
+        // 更新所有该学科的错题
+        const mistakes = mistakeStore.mistakes.filter(m => m.subject === subjectId)
+        mistakes.forEach(m => {
+          if (m.id) {
+            mistakeStore.updateMistake(m.id, { subject: newName })
+          }
+        })
+        setTimeout(async () => {
+          await mistakeStore.loadAll()
+          activeSubject.value = 'all'
+          showToast('学科名称已修改')
+          done()
+        }, 300)
+      } else {
+        done()
+      }
+    },
+  }).catch(() => {})
+}
+
+function startLongPress(subjectId: string) {
+  longPressTimer.value = setTimeout(() => {
+    renameSubject(subjectId)
+  }, 600)
+}
+
+function clearLongPress() {
+  if (longPressTimer.value) {
+    clearTimeout(longPressTimer.value)
+    longPressTimer.value = null
+  }
 }
 
 function goCapture() {
@@ -217,7 +265,10 @@ function getTodayDate() {
 
       <!-- 学科分类（搜索时隐藏） -->
       <div v-if="!showSearch" class="bg-white rounded-2xl card-shadow p-4 mb-4">
-        <p class="text-sm font-medium text-gray-700 mb-3">学科分类</p>
+        <div class="flex items-center justify-between mb-3">
+          <p class="text-sm font-medium text-gray-700">学科分类</p>
+          <span class="text-xs text-gray-400">长按可改名</span>
+        </div>
         <div class="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
           <button
             v-for="subject in allSubjects"
@@ -228,6 +279,9 @@ function getTodayDate() {
               : 'bg-gray-100 text-gray-600'"
             :style="activeSubject === subject.id ? { backgroundColor: subject.color } : {}"
             @click="handleSubjectClick(subject.id)"
+            @touchstart.prevent="subject.id !== 'all' && startLongPress(subject.id)"
+            @touchend="clearLongPress"
+            @contextmenu.prevent="renameSubject(subject.id)"
           >
             {{ subject.name }}
           </button>

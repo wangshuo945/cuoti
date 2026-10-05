@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMistakeStore } from '@/stores/mistake'
 import { recognizeText } from '@/services/ocr'
 import { generateAnswer } from '@/services/ai'
 import { compressImage } from '@/utils/image'
 import ImageCropper from '@/components/ImageCropper.vue'
-import { SUBJECTS } from '@/types'
 import { NavBar, Button, Loading, showToast } from 'vant'
 import {
   Camera,
@@ -14,7 +13,6 @@ import {
   RotateCw,
   Check,
   X,
-  Pencil,
 } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -28,28 +26,18 @@ const analysisText = ref('')
 const subjectText = ref('')
 const loadingOcr = ref(false)
 const loadingAi = ref(false)
-const editingSubject = ref(false)
-const customSubject = ref('')
+
+// 从已有错题中提取最近用过的学科
+const recentSubjects = computed(() => {
+  const subjects = new Set<string>()
+  mistakeStore.mistakes.forEach(m => {
+    if (m.subject) subjects.add(m.subject)
+  })
+  return Array.from(subjects).slice(0, 6)
+})
 
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const cameraInputRef = ref<HTMLInputElement | null>(null)
-
-function selectSubject(name: string) {
-  subjectText.value = name
-  editingSubject.value = false
-}
-
-function toggleEditSubject() {
-  customSubject.value = subjectText.value
-  editingSubject.value = true
-}
-
-function confirmCustomSubject() {
-  if (customSubject.value.trim()) {
-    subjectText.value = customSubject.value.trim()
-  }
-  editingSubject.value = false
-}
 
 function openCamera() {
   cameraInputRef.value?.click()
@@ -303,55 +291,31 @@ async function saveMistake() {
         </div>
 
         <div class="bg-white rounded-2xl card-shadow p-4 mb-4">
-          <div class="flex items-center justify-between mb-3">
-            <p class="text-sm font-medium text-gray-700">学科</p>
-            <button
-              v-if="!editingSubject"
-              class="text-xs text-primary-600 flex items-center gap-1"
-              @click="toggleEditSubject"
-            >
-              <Pencil :size="12" />自定义
-            </button>
+          <p class="text-sm font-medium text-gray-700 mb-3">学科</p>
+          <input
+            v-model="subjectText"
+            type="text"
+            placeholder="输入学科名称，如：数学、物理、化学..."
+            class="w-full p-3 bg-gray-50 rounded-xl text-sm text-gray-700 outline-none border border-transparent focus:border-primary-300"
+            maxlength="20"
+          />
+          <!-- 最近用过的学科快捷选择 -->
+          <div v-if="recentSubjects.length > 0" class="mt-3">
+            <p class="text-xs text-gray-400 mb-2">最近使用</p>
+            <div class="flex flex-wrap gap-2">
+              <button
+                v-for="name in recentSubjects"
+                :key="name"
+                class="px-3 py-1.5 rounded-full text-xs font-medium transition-all"
+                :class="subjectText === name
+                  ? 'bg-primary-600 text-white'
+                  : 'bg-gray-100 text-gray-600'"
+                @click="subjectText = name"
+              >
+                {{ name }}
+              </button>
+            </div>
           </div>
-
-          <!-- 预设分类按钮 -->
-          <div v-if="!editingSubject" class="flex flex-wrap gap-2">
-            <button
-              v-for="s in SUBJECTS"
-              :key="s.id"
-              class="px-4 py-2 rounded-full text-sm font-medium transition-all"
-              :class="subjectText === s.name
-                ? 'text-white'
-                : 'bg-gray-100 text-gray-600'"
-              :style="subjectText === s.name ? { backgroundColor: s.color } : {}"
-              @click="selectSubject(s.name)"
-            >
-              {{ s.name }}
-            </button>
-          </div>
-
-          <!-- 自定义输入 -->
-          <div v-else class="flex gap-2">
-            <input
-              v-model="customSubject"
-              type="text"
-              placeholder="输入自定义学科名称"
-              class="flex-1 p-3 bg-gray-50 rounded-xl text-sm text-gray-700 outline-none border border-transparent focus:border-primary-300"
-              maxlength="20"
-              autofocus
-            />
-            <button
-              class="px-4 py-3 rounded-xl bg-primary-600 text-white text-sm font-medium"
-              @click="confirmCustomSubject"
-            >
-              确定
-            </button>
-          </div>
-
-          <!-- 当前选中提示 -->
-          <p v-if="!editingSubject && subjectText" class="text-xs text-gray-400 mt-2">
-            已选：{{ subjectText }}
-          </p>
         </div>
       </div>
     </div>
